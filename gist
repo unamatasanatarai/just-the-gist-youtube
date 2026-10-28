@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fetch a YouTube transcript, then summarize it with Gemini.
+# Usage: ./gist <youtube-url-or-id> [extra yt-summarize options]
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 <youtube-url-or-id> [yt-summarize options, e.g. --model gemini-3.8-flash]" >&2
+  exit 2
+fi
+
+cd "$(dirname "$0")"
+url="$1"
+shift
+
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+
+# Show yt-transcript's output as it runs, and keep a copy to find the saved path.
+uv run yt-transcript "$url" | tee "$out"
+
+transcript="$(sed -n -E 's/^(Saved|Overwrote) //p' "$out" | tail -n 1)"
+if [[ -z "$transcript" ]]; then
+  echo "Error: could not find the transcript path in yt-transcript output" >&2
+  exit 1
+fi
+
+echo
+uv run yt-summarize "$transcript" "$@"
